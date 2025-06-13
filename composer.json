@@ -1,0 +1,7 @@
+{
+    "require": {
+        "aws/aws-sdk-php": "^3.270",
+        "ext-pdo": "*",
+        "ext-json": "*"
+    }
+}
