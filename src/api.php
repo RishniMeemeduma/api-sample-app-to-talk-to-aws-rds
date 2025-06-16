@@ -1,17 +1,26 @@
 <?php
 require_once 'Database.php';
-
+require_once 'Cache.php';
 class Api {
     private $db;
+    private $cache;
     
     public function __construct() {
         // Initialize database connection
         try {
             $this->db = Database::getInstance();
+            $this->cache = Cache::getInstance();
         } catch (Exception $e) {
             error_log("Database connection error: " . $e->getMessage());
         }
     }
+    public function healthCheck() {
+    // Don't connect to database for health checks
+    return json_encode([
+        'status' => 'healthy',
+        'timestamp' => time()
+    ]);
+}
     
     public function getHello() {
         return json_encode([
@@ -19,14 +28,31 @@ class Api {
             'timestamp' => time()
         ]);
     }
+
+    public function getCacheStatus() {
+    return json_encode([
+        'cache_status' => $this->cache ? $this->cache->getStatus() : 'no cache instance',
+        'time' => date('Y-m-d H:i:s')
+    ]);
+}
     
     public function getUser($id) {
+        // Try to get from cache first
+        $cacheKey = "user:{$id}";
+        $cachedUser = $this->cache->get($cacheKey);
+        echo "Cache key: {$cacheKey}\n and cachedUser: {$cachedUser}\n";
+        if ($cachedUser) {
+            echo "Cache hit for user ID {$id}\n";
+            return $cachedUser;
+        }
+        echo "Cache miss for user ID {$id}\n";
         try {
             // Query user from Aurora database
             $stmt = $this->db->query("SELECT * FROM users WHERE id = ?", [$id]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($user) {
+                $this->cache->set($cacheKey, json_encode($user), 300); // Cache for 5 minutes
                 return json_encode($user);
             } else {
                 http_response_code(404);

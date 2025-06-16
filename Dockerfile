@@ -7,6 +7,9 @@ RUN apt-get update && apt-get install -y \
     git \
     default-mysql-client \
     libpq-dev \
+    redis-tools\
+    && pecl install redis \
+    && docker-php-ext-enable redis \
     && docker-php-ext-install zip pdo pdo_mysql \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
@@ -48,7 +51,7 @@ COPY apache-site.conf /etc/apache2/sites-available/000-default.conf
 # Simple health check
 HEALTHCHECK --interval=5s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:$PORT || exit 1
-  
+
 # Show file structure for debugging
 RUN echo "FINAL STRUCTURE:" && \
     ls -la /var/www/html && \

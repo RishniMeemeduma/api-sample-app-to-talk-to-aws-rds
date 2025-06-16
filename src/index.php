@@ -37,7 +37,9 @@ if ($uri[1] == 'api') {
         echo $api->getStatus();
     } elseif ($uri[2] == 'insert' ) {
         echo $api->insertUser($uri[3] ?? '', $uri[4] ?? '');
-    } else {
+    } elseif ($uri[2] == 'cache-status' ) {
+        echo $api->getCacheStatus();
+    }else {
         // Default response
         echo json_encode([
             'status' => 'error',
