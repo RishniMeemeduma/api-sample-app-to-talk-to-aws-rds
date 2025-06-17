@@ -39,13 +39,15 @@ class Api {
     public function getUser($id) {
         // Try to get from cache first
         $cacheKey = "user:{$id}";
+        error_log("Attempting GET for key: $cacheKey");
         $cachedUser = $this->cache->get($cacheKey);
-        echo "Cache key: {$cacheKey}\n and cachedUser: {$cachedUser}\n";
+        error_log("Raw cached value: " . var_export($cachedUser, true)); 
+
         if ($cachedUser) {
             echo "Cache hit for user ID {$id}\n";
             return $cachedUser;
         }
-        echo "Cache miss for user ID {$id}\n";
+        
         try {
             // Query user from Aurora database
             $stmt = $this->db->query("SELECT * FROM users WHERE id = ?", [$id]);

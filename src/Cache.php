@@ -4,46 +4,62 @@ class Cache {
     private $redis = null;
     
     private function __construct() {
-    try {
-        $endpoint = getenv('CACHE_ENDPOINT');
-        if (empty($endpoint)) {
-            error_log("Cache endpoint not configured");
-            return;
-        }
+// In your __construct function
 
-        $port = getenv('CACHE_PORT') ?: 6380;
-        $useTLS = getenv('ELASTICACHE_TLS') === 'true';
-
-        error_log("Attempting Redis connection to $endpoint:$port (TLS: " . ($useTLS ? 'yes' : 'no') . ")");
-
-        $this->redis = new Redis();
-
-        if ($useTLS) {
-            $context = [                      // Context array (not resource)
-            'stream' => [
-                'verify_peer' => false,
-                'verify_peer_name' => false,
-                'allow_self_signed' => true
-            ]
-            ];
+        try {
+            $endpoint = getenv('CACHE_ENDPOINT');
+            $port = getenv('CACHE_PORT') ?: 6380; // Note: Using 6380 instead of default 6379
+            $useTLS = getenv('ELASTICACHE_TLS') === 'true';
             
-            if (!$this->redis->connect('tls://' . $endpoint, (int)$port, 10.0, null, 0, 0, $context)) {
-                throw new Exception("Redis TLS connection failed");
+            error_log("Attempting Redis connection to {$endpoint}:{$port} (TLS: " . ($useTLS ? 'yes' : 'no') . ")");
+            
+            $this->redis = new Redis();
+            
+            // Connection
+            if ($useTLS) {
+                $context = [
+                    'stream' => [
+                        'verify_peer' => false,
+                        'verify_peer_name' => false
+                    ]
+                ];
+                
+                error_log("Connecting with TLS options");
+                $connected = $this->redis->connect($endpoint, (int)$port, 5.0, null, 0, 0, $context);
+            } else {
+                error_log("Connecting without TLS");
+                $connected = $this->redis->connect($endpoint, (int)$port, 5.0);
             }
-        } else {
-            if (!$this->redis->connect($endpoint, (int)$port, 10.0)) {
+            
+            if (!$connected) {
                 throw new Exception("Redis connection failed");
             }
+            
+            error_log("Connection successful");
+            
+            // Authentication
+            $credentails = json_decode(getenv('ELASTICACHE_PASSWORD')) ;
+            error_log("Auth details ". getenv('ELASTICACHE_PASSWORD'));
+            
+            $password = $credentails->password;
+
+            
+           try {
+            // Format 2: Just password
+            $authResult = $this->redis->auth(['app-user', $password]);
+            
+            error_log("Auth result (format 2): " . ($authResult ? "success" : "failed"));
+        } catch (Exception $e) {
+            error_log("Auth format 2 error: " . $e->getMessage());
         }
-
-        // Test the connection immediately
-        $this->redis->ping();
-        error_log("Redis connection successful");
-
-    } catch (Exception $e) {
-        error_log("Cache connection error: " . $e->getMessage());
-        $this->redis = null;
-    }
+          
+            // Set options
+            error_log("Setting Redis options");
+            $this->redis->setOption(Redis::OPT_READ_TIMEOUT, -1);
+            
+        } catch (Exception $e) {
+            error_log("Cache connection error: " . $e->getMessage());
+        }
 }
     
     public static function getInstance() {
@@ -55,7 +71,9 @@ class Cache {
     
     public function get($key) {
         try {
-            return $this->redis ? $this->redis->get($key) : null;
+            $value = $this->redis ? $this->redis->get($key) : null;
+            error_log("GET result for key '{$key}': " . var_export($value, true));
+            return $value;
         } catch (Exception $e) {
             error_log("Cache get error: " . $e->getMessage());
             return null;
@@ -64,7 +82,11 @@ class Cache {
     
     public function set($key, $value, $ttl = 3600) {
         try {
-            return $this->redis ? $this->redis->setex($key,  $ttl, $value) : false;
+            $result = $this->redis ? $this->redis->setex($key,  $ttl, $value) : false;
+            if ($result === false) {
+                error_log("Cache write failed for key: $key");
+            }
+            return $result;
         } catch (Exception $e) {
             error_log("Cache set error: " . $e->getMessage());
             return false;
