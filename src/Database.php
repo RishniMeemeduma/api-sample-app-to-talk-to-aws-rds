@@ -15,7 +15,7 @@ class Database {
             $host = getenv('DB_ENDPOINT');
             $dbname = getenv('DB_NAME');
             // Connect to Aurora MySQL
-            echo "Connecting to database at $host with name $dbname\n";
+            // echo "Connecting to database at $host with name $dbname\n";
             $this->pdo = new PDO(
                 "mysql:host=". $host.";dbname=".$dbname. "",
                 $secret['username'],

@@ -1,66 +1,13 @@
-<?php
+<?php 
+require_once 'Database.php';
+
 class Cache {
-    private static $instance = null;
-    private $redis = null;
+    protected static $instance = null;
+    protected $redis = null;
     
     private function __construct() {
-// In your __construct function
-
-        try {
-            $endpoint = getenv('CACHE_ENDPOINT');
-            $port = getenv('CACHE_PORT') ?: 6380; // Note: Using 6380 instead of default 6379
-            $useTLS = getenv('ELASTICACHE_TLS') === 'true';
-            
-            error_log("Attempting Redis connection to {$endpoint}:{$port} (TLS: " . ($useTLS ? 'yes' : 'no') . ")");
-            
-            $this->redis = new Redis();
-            
-            // Connection
-            if ($useTLS) {
-                $context = [
-                    'stream' => [
-                        'verify_peer' => false,
-                        'verify_peer_name' => false
-                    ]
-                ];
-                
-                error_log("Connecting with TLS options");
-                $connected = $this->redis->connect($endpoint, (int)$port, 5.0, null, 0, 0, $context);
-            } else {
-                error_log("Connecting without TLS");
-                $connected = $this->redis->connect($endpoint, (int)$port, 5.0);
-            }
-            
-            if (!$connected) {
-                throw new Exception("Redis connection failed");
-            }
-            
-            error_log("Connection successful");
-            
-            // Authentication
-            $credentails = json_decode(getenv('ELASTICACHE_PASSWORD')) ;
-            error_log("Auth details ". getenv('ELASTICACHE_PASSWORD'));
-            
-            $password = $credentails->password;
-
-            
-           try {
-            // Format 2: Just password
-            $authResult = $this->redis->auth(['app-user', $password]);
-            
-            error_log("Auth result (format 2): " . ($authResult ? "success" : "failed"));
-        } catch (Exception $e) {
-            error_log("Auth format 2 error: " . $e->getMessage());
-        }
-          
-            // Set options
-            error_log("Setting Redis options");
-            $this->redis->setOption(Redis::OPT_READ_TIMEOUT, -1);
-            
-        } catch (Exception $e) {
-            error_log("Cache connection error: " . $e->getMessage());
-        }
-}
+        $this->connect();
+    }
     
     public static function getInstance() {
         if (self::$instance == null) {
@@ -68,11 +15,70 @@ class Cache {
         }
         return self::$instance;
     }
+
+    private function connect() {
+        // Create Redis object first
+        $this->redis = new Redis();
+        
+        try {
+            // Get connection details
+            $host = getenv('CACHE_ENDPOINT') ?: 'tif-portal-dev-elasticache-asy7kk.serverless.euw2.cache.amazonaws.com';
+            $port = 6379;
+            $username = 'app-user';
+            
+            // Get credentials
+            $raw_creds = getenv('ELASTICACHE_PASSWORD');
+            $credentials = json_decode($raw_creds, true);
+            $password = is_array($credentials) ? ($credentials['password'] ?? null) : ($credentials->password ?? null);
+            
+            if (empty($password)) {
+                error_log("FATAL: ELASTICACHE_PASSWORD env var not set or invalid.");
+                return false;
+            }
+            
+            // TLS Options
+            $options = [
+                'auth' => [$username, $password],
+                'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+            ];
+            
+            // Call connect() but DON'T reassign $this->redis
+            $connected = $this->redis->connect('tls://' . $host, $port, 1.5, null, 100, 1.5, $options);
+            
+            if (!$connected) {
+                $this->redis = null;  // Clear reference if connection failed
+                error_log("Redis connection failed");
+                return false;
+            }
+            
+            error_log("ElastiCache connection successful!");
+            
+            // Test connection works
+            $testResult = $this->redis->set('test:key', 'Connected!');
+            error_log("Test SET result: " . ($testResult ? "SUCCESS" : "FAILED"));
+            
+            return true;
+        } catch (Exception $e) {
+            error_log("Redis connection error: " . $e->getMessage());
+            $this->redis = null;
+            return false;
+        }
+    }
+    
+    public function isConnected() {
+        return $this->redis !== null;
+    }
     
     public function get($key) {
         try {
-            $value = $this->redis ? $this->redis->get($key) : null;
-            error_log("GET result for key '{$key}': " . var_export($value, true));
+            if (!$this->isConnected()) {
+                error_log("Cache not connected");
+                return null;
+            }
+            
+            $value = $this->redis->get($key);
+            error_log("GET result for key '$key': " . ($value !== false ? "found" : "not found"));
+            
             return $value;
         } catch (Exception $e) {
             error_log("Cache get error: " . $e->getMessage());
@@ -82,33 +88,87 @@ class Cache {
     
     public function set($key, $value, $ttl = 3600) {
         try {
-            $result = $this->redis ? $this->redis->setex($key,  $ttl, $value) : false;
-            if ($result === false) {
-                error_log("Cache write failed for key: $key");
+            if (!$this->isConnected()) {
+                error_log("Cannot set key '$key': Cache not connected");
+                return false;
             }
+            
+            // Set with TTL
+            $result = $this->redis->setex($key, $ttl, $value);
+            error_log("SET result for key '$key': " . ($result ? "SUCCESS" : "FAILED"));
+            
             return $result;
         } catch (Exception $e) {
             error_log("Cache set error: " . $e->getMessage());
             return false;
         }
     }
-    public function getStatus() {
-        $status = [];
-        $status['redis_version'] = phpversion('redis');
-    $status['configured'] = !empty(getenv('CACHE_ENDPOINT')) || !empty(getenv('ELASTICACHE_ENDPOINT'));
-    $status['endpoint'] = getenv('CACHE_ENDPOINT') ?: getenv('ELASTICACHE_ENDPOINT') ?: 'not set';
-    $status['connected'] = $this->redis ? 'yes' : 'no';
     
-    if ($this->redis) {
+    public function getStatus() {
+        if (!$this->isConnected()) {
+            return [
+                'redis_version' => phpversion('redis'),
+                'configured' => true,
+                'endpoint' => getenv('CACHE_ENDPOINT'),
+                'connected' => 'no',
+                'error' => 'Not connected to cache'
+            ];
+        }
+        
         try {
-            $pingResult = $this->redis->ping();
-            $status['ping'] = $pingResult ?: 'failed';
+            $ping = $this->redis->ping();
+            return [
+                'redis_version' => phpversion('redis'),
+                'configured' => true,
+                'endpoint' => getenv('CACHE_ENDPOINT'),
+                'connected' => 'yes',
+                'ping' => $ping ? 'success' : 'failed',
+                'engine' => 'Valkey',
+                'version' => '8.0',
+                'user_group' => 'tif-portal-dev-users',
+                'tls_enabled' => true,
+                'serverless' => true
+            ];
         } catch (Exception $e) {
-            $status['ping_error'] = $e->getMessage();
+            return [
+                'connected' => 'no',
+                'error' => $e->getMessage()
+            ];
         }
     }
     
-    return $status;
+    public function testOperations() {
+        if (!$this->isConnected()) {
+            return ['error' => 'Not connected'];
+        }
+        
+        $results = [];
+        
+        try {
+            // Test SET
+            $setResult = $this->redis->setex('test:valkey', 300, 'Hello from Valkey Serverless!');
+            $results['set'] = $setResult ? 'SUCCESS' : 'FAILED';
+            
+            // Test GET
+            $getValue = $this->redis->get('test:valkey');
+            $results['get'] = $getValue ?: 'FAILED';
+            
+            // Test TTL
+            $ttl = $this->redis->ttl('test:valkey');
+            $results['ttl'] = $ttl;
+            
+            // Test DELETE
+            $delResult = $this->redis->del('test:valkey');
+            $results['delete'] = $delResult ? 'SUCCESS' : 'FAILED';
+            
+        } catch (Exception $e) {
+            $results['error'] = $e->getMessage();
+        }
+        
+        return $results;
+    }
+    
+    public function getRedisInstance() {
+        return $this->redis;
+    }
 }
-}
-?>

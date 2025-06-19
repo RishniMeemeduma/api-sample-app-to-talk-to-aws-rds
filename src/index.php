@@ -39,6 +39,10 @@ if ($uri[1] == 'api') {
         echo $api->insertUser($uri[3] ?? '', $uri[4] ?? '');
     } elseif ($uri[2] == 'cache-status' ) {
         echo $api->getCacheStatus();
+    } else if ($uri[2] === 'cache-all') {
+        echo $api->getAllCacheData();
+    } else if($uri[2] === 'redis-test') {
+        echo $api->testRedisOperations();
     }else {
         // Default response
         echo json_encode([
