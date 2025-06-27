@@ -89,7 +89,7 @@ class Cache {
     public function set($key, $value, $ttl = 3600) {
         try {
             if (!$this->isConnected()) {
-                error_log("Cannot set key '$key': Cache not connected");
+                error_log("Cannot set key '$key': Cache not connected ");
                 return false;
             }
             
