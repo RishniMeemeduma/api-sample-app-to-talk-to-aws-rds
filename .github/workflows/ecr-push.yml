@@ -5,6 +5,21 @@ on:
     branches: [main]
 
 jobs:
+  check-if-merge:
+    runs-on : ubuntu-latest
+    outputs: 
+      is-merge:${{ steps.check_merge.outputs.is-merge }}
+    steps:
+    - name: Check if this is a merge commit
+      id: check_merge
+      run: |
+        if [[ "${{ github.event.head_commit.message}}" == "Merge pull request"]]; then
+          echo "is-merge=true" >> $GITHUB_OUTPUT
+        else
+          echo "is-merge=false" >> $GITHUB_OUTPUT
+        fi
+        echo "commit message: ${{ github.event.head_commit.message }}" 
+      
   build-and-push:
     runs-on: ubuntu-latest
     
