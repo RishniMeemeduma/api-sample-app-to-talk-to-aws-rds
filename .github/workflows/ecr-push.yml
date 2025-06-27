@@ -59,4 +59,4 @@ jobs:
     - name: Deploy to Amazon ECS
       if: ${{ steps.check_merge.outputs.is_merge == 'true' }}
       run: |
-        aws ecs update-service --cluster tif-portal-dev-cluster --service tif-dev-eu-west-2-service-web --force-new-deployment
+        aws ecs update-service --cluster tif-portal-dev-cluster --service tif-dev-eu-west-2-service-api --force-new-deployment
