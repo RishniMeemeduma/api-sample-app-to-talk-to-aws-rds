@@ -1,4 +1,4 @@
-name: Build and Push to ECR
+name: Build and Push and Deploy to ECR and ECS
 
 on:
   push:
@@ -56,17 +56,7 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
   # ---------- Register Task Definition for API ----------
-    - name: Render web task definition
-      id: render-web
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
-      with:
-        task-definition: ecs/web-task-def.json
-        container-name: web
-        image: ${{ steps.login-ecr.outputs.registry }}/tif-web:${{ github.sha }}
-
-    - name: Deploy web to ECS
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        cluster: your-cluster-name
-        service: web-service
-        task-definition: ${{ steps.render-web.outputs.task-definition }}
+    - name: Deploy to Amazon ECS
+      if: ${{ steps.check_merge.outputs.is_merge == 'true' }}
+      run: |
+        aws ecs update-service --cluster tif-portal-dev-cluster --service tif-dev-eu-west-2-service-web --force-new-deployment
