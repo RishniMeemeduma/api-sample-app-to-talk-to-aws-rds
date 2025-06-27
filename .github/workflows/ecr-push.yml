@@ -55,7 +55,8 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-        - name: Render web task definition
+  # ---------- Register Task Definition for API ----------
+    - name: Render web task definition
       id: render-web
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
