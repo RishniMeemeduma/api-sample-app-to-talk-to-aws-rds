@@ -86,5 +86,5 @@ jobs:
       with:
         task-definition: ${{ steps.task-def.outputs.task-definition }}
         service: tif-dev-eu-west-2-service-api
-        cluster: tif-portal-dev-cluster
+        cluster: tif-dev-eu-west-2-ecs-cluster
         wait-for-service-stability: true
