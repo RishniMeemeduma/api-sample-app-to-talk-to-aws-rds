@@ -70,7 +70,7 @@ jobs:
 
     - name: Download current task definition
       run: |
-        aws ecs describe-task-definition --task-definition tif-dev-api-task \
+        aws ecs describe-task-definition --task-definition tif-dev-eu-west-2-taskdef-api \
           --query taskDefinition > task-definition.json
 
     - name: Update task definition with new image
