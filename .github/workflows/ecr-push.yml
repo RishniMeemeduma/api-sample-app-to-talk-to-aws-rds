@@ -45,7 +45,7 @@ jobs:
     - name: Store current image info
       id: current-image
       run: |
-        CURRENT_TASK_DEF=$(aws ecs describe-task-definition --task-definition tif-dev-eu-west-2-service-api  --query taskDefinition)
+        CURRENT_TASK_DEF=$(aws ecs describe-task-definition --task-definition tif-dev-eu-west-2-taskdef-api  --query taskDefinition)
         CURRENT_IMAGE=$(echo $CURRENT_TASK_DEF | jq -r '.containerDefinitions[0].image')
         echo "current_image=$CURRENT_IMAGE" >> $GITHUB_OUTPUT
         # Store current image in SSM Parameter Store for rollbacks
