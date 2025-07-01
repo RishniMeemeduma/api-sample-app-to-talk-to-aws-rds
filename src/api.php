@@ -32,7 +32,7 @@ class Api {
     }
 
     public function getCacheStatus() {
-       return $this->cache->getStatus();
+       return json_encode([$this->cache->getStatus()]);
 
     }
     

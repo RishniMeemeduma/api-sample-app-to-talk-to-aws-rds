@@ -21,7 +21,7 @@ jobs:
           fi
           echo "Commit message: ${{ github.event.head_commit.message }}"
       
-  build-and-push-deploy:
+  build-push-deploy:
     needs: check-if-merge
     if: needs.check-if-merge.outputs.is_merge == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
