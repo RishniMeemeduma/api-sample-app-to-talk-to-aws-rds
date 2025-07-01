@@ -11,7 +11,7 @@ class Api {
             $this->db = Database::getInstance();
             $this->cache = Cache::getInstance();
 
-             echo "Cache initialization: " . ($this->cache ? "SUCCESS" : "FAILED") . "\n";
+            //  echo "Cache initialization: " . ($this->cache ? "SUCCESS" : "FAILED") . "\n";
         } catch (Exception $e) {
             error_log("Database connection error: " . $e->getMessage());
         }
@@ -32,7 +32,7 @@ class Api {
     }
 
     public function getCacheStatus() {
-        $this->cache->getStatus();
+       return $this->cache->getStatus();
 
     }
     
